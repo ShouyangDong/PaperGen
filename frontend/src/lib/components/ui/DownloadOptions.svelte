@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Button from './Button.svelte';
 	import Icon from '@iconify/svelte';
-	import { downloadMarkdown, downloadDocxFile, downloadProjectReport, loadCompleteDraftData } from '$lib/utils/downloads';
+	import { downloadMarkdown, downloadDocxFile, downloadPdfFile, downloadProjectReport, loadCompleteDraftData } from '$lib/utils/downloads';
 	import * as m from '$lib/paraglide/messages.js';
 
 	interface Props {
@@ -66,6 +66,27 @@
 		}
 	}
 
+	async function handleDownloadPdf() {
+		try {
+			isDownloading = true;
+			const filename = manuscriptTitle || projectTitle;
+			
+			let downloadContent = content;
+			if (!downloadContent) {
+				// Load content from localStorage if not provided
+				const draftData = loadCompleteDraftData(draftId);
+				downloadContent = draftData?.content || `# ${filename}\n\n[No content available]`;
+			}
+			
+			await downloadPdfFile(downloadContent, filename);
+		} catch (error) {
+			console.error('Failed to download PDF:', error);
+			alert(m.download_error_pdf());
+		} finally {
+			isDownloading = false;
+		}
+	}
+
 	async function handleDownloadReport() {
 		try {
 			isDownloading = true;
@@ -98,7 +119,7 @@
 		{/if}
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 		<!-- Markdown Download -->
 		<div class="border border-secondary-200 rounded-lg p-4">
 			<div class="flex items-center space-x-2 mb-2">
@@ -134,6 +155,25 @@
 				class="w-full"
 			>
 				{isDownloading ? m.download_converting() : m.download_docx_button()}
+			</Button>
+		</div>
+
+		<!-- PDF Download -->
+		<div class="border border-secondary-200 rounded-lg p-4">
+			<div class="flex items-center space-x-2 mb-2">
+				<Icon icon="heroicons:document" class="w-5 h-5 text-red-600" />
+				<h4 class="font-medium text-secondary-900">{m.download_pdf_title()}</h4>
+			</div>
+			<p class="text-sm text-secondary-600 mb-3">{m.download_pdf_description()}</p>
+			<Button
+				onclick={handleDownloadPdf}
+				disabled={isDownloading}
+				variant="secondary"
+				size="sm"
+				iconLeft="heroicons:arrow-down-tray"
+				class="w-full"
+			>
+				{isDownloading ? m.download_converting() : m.download_pdf_button()}
 			</Button>
 		</div>
 

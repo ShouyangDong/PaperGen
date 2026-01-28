@@ -17,7 +17,7 @@
 		if (!savedLocale) {
 			// Get browser language preference
 			const browserLanguage = navigator.language.toLowerCase();
-			const supportedLanguages = ['en', 'ko'];
+			const supportedLanguages = ['en', 'cn'];
 			
 			// Try exact match first (e.g., 'ko')
 			let detectedLanguage = supportedLanguages.find(lang => 

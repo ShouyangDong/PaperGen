@@ -6,6 +6,9 @@ import type { Citation } from '$lib/stores/drafts';
 import { listPlugin } from "@m2d/list";
 import { tablePlugin } from '@m2d/table';
 import { getUnifiedSettings } from '$lib/stores/settings';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import { marked } from 'marked';
 
 interface DraftData {
 	id: string;
@@ -107,6 +110,65 @@ export async function downloadDocxFile(content: string, filename: string) {
 	} catch (error) {
 		console.error('Failed to convert to DOCX:', error);
 		throw new Error('Failed to generate DOCX file');
+	}
+}
+
+/**
+ * Download draft content as PDF file
+ */
+export async function downloadPdfFile(content: string, filename: string) {
+	try {
+		// Convert markdown to HTML
+		const htmlContent = marked(content);
+		
+		// Create a temporary div to render HTML
+		const tempDiv = document.createElement('div');
+		tempDiv.innerHTML = htmlContent;
+		tempDiv.style.width = '210mm'; // A4 width
+		tempDiv.style.padding = '20mm';
+		tempDiv.style.fontFamily = 'Arial, sans-serif';
+		tempDiv.style.fontSize = '12px';
+		tempDiv.style.lineHeight = '1.5';
+		tempDiv.style.backgroundColor = 'white';
+		tempDiv.style.color = 'black';
+		document.body.appendChild(tempDiv);
+		
+		// Use html2canvas to render the HTML to canvas
+		const canvas = await html2canvas(tempDiv, { 
+			scale: 2,
+			useCORS: true,
+			backgroundColor: '#ffffff'
+		});
+		
+		// Create PDF
+		const pdf = new jsPDF('p', 'mm', 'a4');
+		const imgData = canvas.toDataURL('image/png');
+		const imgWidth = 210;
+		const pageHeight = 295;
+		const imgHeight = (canvas.height * imgWidth) / canvas.width;
+		let heightLeft = imgHeight;
+		let position = 0;
+		
+		// Add first page
+		pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+		heightLeft -= pageHeight;
+		
+		// Add additional pages if needed
+		while (heightLeft >= 0) {
+			position = heightLeft - imgHeight;
+			pdf.addPage();
+			pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+			heightLeft -= pageHeight;
+		}
+		
+		// Download the PDF
+		pdf.save(`${filename}.pdf`);
+		
+		// Clean up
+		document.body.removeChild(tempDiv);
+	} catch (error) {
+		console.error('Failed to convert to PDF:', error);
+		throw new Error('Failed to generate PDF file');
 	}
 }
 

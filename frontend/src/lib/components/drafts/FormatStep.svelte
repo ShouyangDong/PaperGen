@@ -93,7 +93,6 @@
 	// Target languages
 	const targetLanguages = [
 		{ value: 'English', label: 'English' },
-		{ value: 'Korean', label: '한국어 (Korean)' },
 		{ value: 'Japanese', label: '日本語 (Japanese)' },
 		{ value: 'Chinese', label: '中文 (Chinese)' },
 		{ value: 'Spanish', label: 'Español (Spanish)' },

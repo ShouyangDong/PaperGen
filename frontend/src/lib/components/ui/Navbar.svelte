@@ -17,7 +17,7 @@
 
 	const languages = [
 		{ code: 'en', name: 'English', flag: '🇺🇸' },
-		{ code: 'ko', name: '한국어', flag: '🇰🇷' }
+		{ code: 'cn', name: '中文', flag: '🇨🇳' }
 	];
 
 	function toggleMobileMenu() {
@@ -64,7 +64,7 @@
 			<!-- Logo and Site Title -->
 			<div class="flex items-center gap-6">
 				<a href="/" class="text-lg font-semibold text-secondary-900 hover:text-primary-600 transition-colors">
-					COLab Tools
+					PaperMind Tools
 				</a>
 
 				<!-- Desktop Menu Items -->

@@ -13,7 +13,7 @@
 
 	const languages = [
 		{ code: 'en', name: 'English' },
-		{ code: 'ko', name: '한국어' }
+		{ code: 'cn', name: '中文' }
 	];
 
 	let selectedLanguage = $derived(
