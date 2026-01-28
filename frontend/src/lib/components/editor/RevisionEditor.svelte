@@ -43,6 +43,7 @@
     // Modal states for BubbleMenu actions
     let showReviseModal = $state(false);
     let showFactCheckModal = $state(false);
+    let showManualEditModal = $state(false);
     let originalText = $state('');
     let revisedText = $state('');
     let factCheckResult = $state('');
@@ -102,6 +103,18 @@
         } finally {
             isLoadingFactCheck = false;
         }
+    }
+
+    function handleManualEdit(event: CustomEvent) {
+        const { selectedText, selectionRange } = event.detail;
+
+        // Store selection range for later use
+        currentSelectionRange = selectionRange;
+
+        // Show modal with selected text for manual editing
+        originalText = selectedText;
+        revisedText = selectedText; // Initialize with original text
+        showManualEditModal = true;
     }
 
     async function handleCustomRevision() {
@@ -165,6 +178,27 @@
         isLoadingFactCheck = false;
     }
 
+    function closeManualEditModal() {
+        showManualEditModal = false;
+        originalText = '';
+        revisedText = '';
+    }
+
+    function applyManualEdit() {
+        if (!editor) return;
+        
+        // Replace the selected text with the manually edited text using stored selection range
+        const { from, to } = currentSelectionRange;
+        
+        editor.chain()
+            .focus()
+            .setTextSelection({ from, to })
+            .insertContent(revisedText)
+            .run();
+            
+        closeManualEditModal();
+    }
+
     // Reactive computation for diff
     let diffResult = $derived(() => {
         if (originalText && revisedText) {
@@ -172,16 +206,35 @@
         }
         return { diffResult: '' };
     });
+
+    // BubbleMenu shouldShow function - only show when text is actually selected
+    function shouldShowBubbleMenu({ editor, view, state, oldState, from, to }: any) {
+        // Don't show if editor is not editable
+        if (!editor.isEditable) {
+            return false;
+        }
+
+        // Don't show if selection is empty
+        if (state.selection.empty) {
+            return false;
+        }
+
+        // Only show if there's actual text selected (not just cursor position)
+        const selectedText = state.doc.textBetween(from, to);
+        return selectedText.length > 0;
+    }
+
 </script>
 
 <div class="z-50 mx-5">
     {#if editor && !editor.isDestroyed}
         <DragHandle editor={editor} />
-        <BubbleMenu editor={editor}>
+        <BubbleMenu editor={editor} shouldShow={shouldShowBubbleMenu}>
             <BubbleMenuContent 
                 {editor} 
                 on:ai-revise={handleAIRevise}
                 on:ai-fact-check={handleAIFactCheck}
+                on:manual-edit={handleManualEdit}
             />
         </BubbleMenu>
         <EdraToolBar editor={editor} />
@@ -341,6 +394,73 @@
                 <Button onclick={closeFactCheckModal} variant="primary" disabled={isLoadingFactCheck}>
                     {isLoadingFactCheck ? 'Processing...' : 'Close'}
                 </Button>
+            </div>
+        </div>
+    {/snippet}
+</Modal>
+
+<!-- Manual Edit Modal -->
+<Modal 
+    show={showManualEditModal} 
+    title="手动编辑文本"
+    onClose={closeManualEditModal}
+    size="4xl"
+>
+    {#snippet children()}
+        <div class="space-y-4">
+            <!-- Original Text Display -->
+            <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <h4 class="text-sm font-semibold text-gray-900 mb-2">原文：</h4>
+                <div class="text-sm text-gray-700 whitespace-pre-wrap">{originalText}</div>
+            </div>
+
+            <!-- Manual Edit Input -->
+            <div class="p-4 border border-gray-200 rounded-lg">
+                <label for="manualEditText" class="block text-sm font-medium text-gray-700 mb-2">
+                    编辑后的文本：
+                </label>
+                <textarea
+                    id="manualEditText"
+                    bind:value={revisedText}
+                    placeholder="在这里输入您想要的修改后的文本..."
+                    class="w-full p-3 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                    rows="8"
+                    spellcheck="true"
+                ></textarea>
+                <div class="mt-2 text-xs text-gray-500">
+                    提示：您可以直接编辑文本，进行任何您想要的修改。
+                </div>
+            </div>
+
+            <!-- Diff View (if text changed) -->
+            {#if originalText !== revisedText}
+                <div class="p-4 border border-gray-200 rounded-lg">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-2">修改预览：</h4>
+                    {@html diffResult().diffResult}
+                </div>
+            {/if}
+            
+            <div class="flex justify-between items-center pt-4">
+                {#if originalText !== revisedText}
+                    <div class="text-xs text-gray-500">
+                        <span class="inline-flex items-center">
+                            <span class="w-3 h-3 bg-yellow-100 border border-yellow-200 rounded mr-1"></span>
+                            删除
+                        </span>
+                        <span class="inline-flex items-center ml-4">
+                            <span class="w-3 h-3 bg-blue-100 border border-blue-200 rounded mr-1"></span>
+                            添加
+                        </span>
+                    </div>
+                {:else}
+                    <div></div>
+                {/if}
+                <div class="flex space-x-3">
+                    <Button onclick={closeManualEditModal} variant="secondary">取消</Button>
+                    <Button onclick={applyManualEdit} variant="primary" disabled={originalText === revisedText}>
+                        应用修改
+                    </Button>
+                </div>
             </div>
         </div>
     {/snippet}

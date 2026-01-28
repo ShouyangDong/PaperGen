@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Editor } from '@tiptap/core';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { WandSparkles, SearchCheck } from '@lucide/svelte';
+	import { WandSparkles, SearchCheck, Edit } from '@lucide/svelte';
 	import { createEventDispatcher } from 'svelte';
 	// i18n
 	import { m } from '$lib/paraglide/messages.js';
@@ -57,6 +57,28 @@
 		editor.commands.setTextSelection(selectionRange.to);
 	}
 
+	function handleManualEdit() {
+		// Get selected text from the current selection
+		const selectedText = getSelectedText();
+		
+		if (!selectedText.trim()) {
+			alert(m.bubble_menu_no_text_selected_manual_edit());
+			return;
+		}
+
+		// Store selection range before losing focus
+		const selectionRange = { from: editor.state.selection.from, to: editor.state.selection.to };
+
+		// Dispatch event to parent component
+		dispatch('manual-edit', {
+			selectedText,
+			selectionRange
+		});
+
+		// Clear selection to close bubble menu by setting cursor to end of selection
+		editor.commands.setTextSelection(selectionRange.to);
+	}
+
 
 	function getSelectedText(): string {
 		const { from, to } = editor.state.selection;
@@ -83,5 +105,15 @@
 	>
 		<SearchCheck class="w-4 h-4 mr-1" />
 		{m.bubble_menu_ai_fact_check()}
+	</Button>
+
+	<Button 
+		onclick={handleManualEdit} 
+		variant="ghost" 
+		size="sm"
+		class="flex items-center"
+	>
+		<Edit class="w-4 h-4 mr-1" />
+		{m.bubble_menu_manual_edit()}
 	</Button>
 </div>
