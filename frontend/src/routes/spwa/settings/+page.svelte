@@ -1,0 +1,894 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import Button from '$lib/components/ui/Button.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Label from '$lib/components/ui/Label.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Card from '$lib/components/ui/Card.svelte';
+	import Heading from '$lib/components/ui/Heading.svelte';
+	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import Icon from '@iconify/svelte';
+	import { getLocale } from '$lib/paraglide/runtime.js';
+	
+	// i18n
+	import { m } from '$lib/paraglide/messages.js';
+
+	// Import stores
+	import {
+		providerType,
+		selectedModel,
+		openRouterApiKey,
+		openAIApiKey,
+		customEndpoint,
+		customApiKey,
+		customModelName,
+		azureApiKey,
+		azureEndpoint,
+		azureDeployment,
+		azureApiVersion,
+		modelParameters
+	} from '$lib/stores/settings.js';
+	
+	// Import the type separately
+	import type { ProviderType } from '$lib/stores/settings.js';
+
+	// Local state for reactive updates
+	let currentProviderType = $state<ProviderType>('openrouter');
+	let currentOpenRouterApiKey = $state('');
+	let currentOpenAIApiKey = $state('');
+	let currentAzureApiKey = $state('');
+	let currentAzureEndpoint = $state('');
+	let currentAzureDeployment = $state('');
+	let currentAzureApiVersion = $state('');
+	let currentSelectedModel = $state('openai/gpt-5-chat');
+	let currentCustomEndpoint = $state('');
+	let currentCustomApiKey = $state('');
+	let currentCustomModelName = $state('');
+	let currentTemperature = $state(0.7);
+	let currentMaxTokens = $state(8192);
+
+	// Initialize from stores and sync changes
+	$effect(() => {
+		// Load initial values from stores
+		const unsubscribes = [
+			providerType.subscribe(v => currentProviderType = v),
+			openRouterApiKey.subscribe(v => currentOpenRouterApiKey = v),
+			openAIApiKey.subscribe(v => currentOpenAIApiKey = v),
+			azureApiKey.subscribe(v => currentAzureApiKey = v),
+			azureEndpoint.subscribe(v => currentAzureEndpoint = v),
+			azureDeployment.subscribe(v => currentAzureDeployment = v),
+			azureApiVersion.subscribe(v => currentAzureApiVersion = v),
+			customEndpoint.subscribe(v => currentCustomEndpoint = v),
+			customApiKey.subscribe(v => currentCustomApiKey = v),
+			customModelName.subscribe(v => currentCustomModelName = v),
+			selectedModel.subscribe(v => {
+				if (v?.id) {
+					currentSelectedModel = v.id;
+				}
+			}),
+			modelParameters.subscribe(v => {
+				currentTemperature = v.temperature;
+				currentMaxTokens = v.maxTokens;
+			})
+		];
+
+		// Cleanup subscriptions
+		return () => unsubscribes.forEach(unsub => unsub());
+	});
+
+	// Sync local changes back to stores
+	$effect(() => {
+		providerType.set(currentProviderType);
+	});
+
+	$effect(() => {
+		openRouterApiKey.set(currentOpenRouterApiKey);
+	});
+
+	$effect(() => {
+		openAIApiKey.set(currentOpenAIApiKey);
+	});
+
+	$effect(() => {
+		azureApiKey.set(currentAzureApiKey);
+	});
+
+	$effect(() => {
+		azureEndpoint.set(currentAzureEndpoint);
+	});
+
+	$effect(() => {
+		azureDeployment.set(currentAzureDeployment);
+	});
+
+	$effect(() => {
+		azureApiVersion.set(currentAzureApiVersion);
+	});
+
+	$effect(() => {
+		// Find the selected model from available models and update store
+		if (currentSelectedModel && allModels.length > 0) {
+			const model = allModels.find(m => m.id === currentSelectedModel);
+			if (model) {
+				selectedModel.set(model);
+			}
+		}
+	});
+
+	$effect(() => {
+		customEndpoint.set(currentCustomEndpoint);
+	});
+
+	$effect(() => {
+		customApiKey.set(currentCustomApiKey);
+	});
+
+	$effect(() => {
+		customModelName.set(currentCustomModelName);
+	});
+
+	$effect(() => {
+		modelParameters.set({
+			temperature: currentTemperature,
+			maxTokens: currentMaxTokens,
+			topP: 1.0,
+			frequencyPenalty: 0.0,
+			presencePenalty: 0.0
+		});
+	});
+
+	// UI state
+	let testingConnection = $state(false);
+	let connectionStatus = $state<'idle' | 'success' | 'error'>('idle');
+	let connectionMessage = $state('');
+	let loadingModels = $state(false);
+	let initialLoadComplete = $state(false);
+
+	// Featured model IDs
+	const featuredModelIds = [
+		'openai/gpt-5.1',
+		'anthropic/claude-sonnet-4.5',
+		'google/gemini-3-pro-preview',
+	];
+
+	// LLM models from OpenRouter
+	let llmModels = $state<any[]>([]);
+	
+	// Featured models with complete data from LLM API
+	let featuredModels = $derived(() => {
+		const featuredIds = new Set(featuredModelIds);
+		return llmModels
+			.filter(model => featuredIds.has(model.id))
+			.map(model => {
+				const providerId = model.name?.split(':')[0] || model.id.split('/')[0];
+				return {
+					...model,
+					provider: providerId,
+					category: 'Popular'
+				};
+			});
+	});
+
+	// Non-featured LLM models  
+	let otherModels = $derived(() => {
+		return llmModels
+			.map(model => {
+				const providerId = model.name?.split(':')[0] || model.id.split('/')[0];
+				return {
+					...model,
+					name: model.name || model.id,
+					provider: providerId,
+					category: providerId
+				};
+			});
+	});
+
+	// All models combined
+	let allModels = $derived([...featuredModels(), ...otherModels()]);
+
+	// Group models by category for dropdown
+	let modelsByCategory = $derived(() => {
+		const grouped: Record<string, any[]> = {};
+		
+		allModels.forEach(model => {
+			const category = model.category;
+			if (!grouped[category]) {
+				grouped[category] = [];
+			}
+			grouped[category].push(model);
+		});
+
+		// Sort categories (Popular first, then alphabetically)
+		const sortedCategories: Record<string, any[]> = {};
+		const categoryOrder = Object.keys(grouped).sort((a, b) => {
+			if (a === 'Popular') return -1;
+			if (b === 'Popular') return 1;
+			return a.localeCompare(b);
+		});
+
+		categoryOrder.forEach(category => {
+			sortedCategories[category] = grouped[category].sort((a, b) => a.name.localeCompare(b.name));
+		});
+
+		return sortedCategories;
+	});
+
+	// Tab configuration
+	const providerTabs = [
+		{ id: 'openrouter', label: 'OpenRouter', icon: 'heroicons:globe-alt' },
+		{ id: 'openai', label: 'OpenAI', icon: 'heroicons:chat-bubble-left-right' },
+		{ id: 'azure', label: 'Azure OpenAI', icon: 'heroicons:cloud' },
+		{ id: 'custom', label: 'Custom LLM', icon: 'heroicons:server' }
+	];
+
+	// Load settings from stores on mount
+	onMount(() => {
+		// Subscribe to stores and update local state
+		providerType.subscribe(type => currentProviderType = type);
+		openRouterApiKey.subscribe(key => currentOpenRouterApiKey = key);
+		openAIApiKey.subscribe(key => currentOpenAIApiKey = key);
+		azureApiKey.subscribe(key => currentAzureApiKey = key);
+		azureEndpoint.subscribe(endpoint => currentAzureEndpoint = endpoint || '');
+		azureDeployment.subscribe(deployment => currentAzureDeployment = deployment || '');
+		azureApiVersion.subscribe(version => currentAzureApiVersion = version || '');
+		selectedModel.subscribe(model => currentSelectedModel = model?.id || 'openai/gpt-5');
+		customEndpoint.subscribe(endpoint => currentCustomEndpoint = endpoint || '');
+		customApiKey.subscribe(key => currentCustomApiKey = key);
+		customModelName.subscribe(name => currentCustomModelName = name || '');
+		modelParameters.subscribe(params => {
+			currentTemperature = params.temperature;
+			currentMaxTokens = params.maxTokens;
+		});
+
+		fetchLlmModels();
+		initialLoadComplete = true;
+	});
+
+	async function fetchLlmModels() {
+		loadingModels = true;
+		try {
+			// Check cache first
+			const cached = getCachedModels();
+			if (cached) {
+				llmModels = cached;
+				loadingModels = false;
+				return;
+			}
+
+			const url = 'https://openrouter.ai/api/v1/models';
+			const response = await fetch(url);
+			const data = await response.json();
+			
+			if (data.data && Array.isArray(data.data)) {
+				// Filter models that support both temperature and tools parameters
+				const filteredModels = data.data.filter((model: any) => {
+					const supportedParams = model.supported_parameters || [];
+					const inputModalities = model.architecture.input_modalities || [];
+					return supportedParams.includes('tools') && inputModalities.includes('text') && inputModalities.includes('image');
+				});
+
+				const processedModels = filteredModels.map((model: any) => ({
+					id: model.id,
+					name: model.name || model.id.split('/').pop(),
+					context_length: model.context_length,
+					pricing: model.pricing,
+					supported_parameters: model.supported_parameters
+				}));
+				
+				llmModels = processedModels;
+				cacheModels(processedModels);
+			}
+		} catch (error) {
+			console.error('Failed to fetch LLM models:', error);
+			const cached = getCachedModels(true);
+			if (cached) {
+				llmModels = cached;
+			}
+		} finally {
+			loadingModels = false;
+		}
+	}
+
+	function getCachedModels(ignoreExpiry = false): any[] | null {
+		try {
+			const cached = localStorage.getItem('paperwriter-cached-models');
+			if (!cached) return null;
+
+			const { models, timestamp } = JSON.parse(cached);
+			const now = Date.now();
+			const oneDay = 24 * 60 * 60 * 1000;
+
+			if (!ignoreExpiry && now - timestamp > oneDay) {
+				localStorage.removeItem('paperwriter-cached-models');
+				return null;
+			}
+
+			return models;
+		} catch (error) {
+			console.error('Failed to load cached models:', error);
+			return null;
+		}
+	}
+
+	function cacheModels(models: any[]) {
+		try {
+			const cacheData = { models, timestamp: Date.now() };
+			localStorage.setItem('paperwriter-cached-models', JSON.stringify(cacheData));
+		} catch (error) {
+			console.error('Failed to cache models:', error);
+		}
+	}
+
+	async function testApiConnection() {
+		if (currentProviderType === 'openrouter') {
+			if (!currentOpenRouterApiKey.trim()) {
+				connectionStatus = 'error';
+				connectionMessage = m.settings_enter_api_key();
+				return;
+			}
+
+			testingConnection = true;
+			connectionStatus = 'idle';
+
+			try {
+				const response = await fetch('https://openrouter.ai/api/v1/auth/key', {
+					method: 'GET',
+					headers: {
+						'Authorization': `Bearer ${currentOpenRouterApiKey}`,
+						//'HTTP-Referer': window.location.origin,
+						//'X-Title': 'Paper Writer Assistant'
+					}
+				});
+
+				if (response.ok) {
+					connectionStatus = 'success';
+					connectionMessage = m.settings_api_key_valid();
+				} else {
+					const errorData = await response.json().catch(() => ({}));
+					connectionStatus = 'error';
+					connectionMessage = errorData.error?.message || m.settings_invalid_api_key({ status: response.status });
+				}
+			} catch (error) {
+				connectionStatus = 'error';
+				connectionMessage = m.settings_network_error({ error: error instanceof Error ? error.message : m.settings_unknown_error() });
+			} finally {
+				testingConnection = false;
+			}
+		} else if (currentProviderType === 'openai') {
+			if (!currentOpenAIApiKey.trim()) {
+				connectionStatus = 'error';
+				connectionMessage = m.settings_enter_api_key();
+				return;
+			}
+
+			testingConnection = true;
+			connectionStatus = 'idle';
+
+			try {
+				const response = await fetch('https://api.openai.com/v1/models', {
+					method: 'GET',
+					headers: {
+						'Authorization': `Bearer ${currentOpenAIApiKey}`,
+						'Content-Type': 'application/json'
+					}
+				});
+
+				if (response.ok) {
+					connectionStatus = 'success';
+					connectionMessage = m.settings_api_key_valid();
+				} else {
+					const errorData = await response.json().catch(() => ({}));
+					connectionStatus = 'error';
+					connectionMessage = errorData.error?.message || m.settings_invalid_api_key({ status: response.status });
+				}
+			} catch (error) {
+				connectionStatus = 'error';
+				connectionMessage = m.settings_network_error({ error: error instanceof Error ? error.message : m.settings_unknown_error() });
+			} finally {
+				testingConnection = false;
+			}
+		} else if (currentProviderType === 'azure') {
+			if (!currentAzureApiKey.trim() || !currentAzureEndpoint.trim() || !currentAzureDeployment.trim()) {
+				connectionStatus = 'error';
+				connectionMessage = 'Please enter Azure endpoint, deployment name, and API key';
+				return;
+			}
+
+			testingConnection = true;
+			connectionStatus = 'idle';
+
+			try {
+				const baseUrl = currentAzureEndpoint.trim().replace(/\/+$/, '');
+				const apiVersion = currentAzureApiVersion.trim() || '2024-12-01-preview';
+				const deployment = currentAzureDeployment.trim();
+				
+				// Test Azure OpenAI connection using chat completions endpoint
+				const response = await fetch(`${baseUrl}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`, {
+					method: 'POST',
+					headers: {
+						'api-key': currentAzureApiKey,
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						messages: [{ role: 'user', content: 'test' }],
+						max_completion_tokens: 16384
+					})
+				});
+
+				if (response.ok || response.status === 401) {
+					// 401 means authentication works but we don't have proper permissions for this operation
+					// This is still a successful connection test
+					connectionStatus = 'success';
+					connectionMessage = 'Azure OpenAI connection successful!';
+				} else {
+					const errorData = await response.json().catch(() => ({}));
+					connectionStatus = 'error';
+					connectionMessage = errorData.error?.message || `Azure API error: ${response.status} ${response.statusText}`;
+				}
+			} catch (error) {
+				connectionStatus = 'error';
+				connectionMessage = `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+			} finally {
+				testingConnection = false;
+			}
+		} else {
+			// Test custom endpoint
+			if (!currentCustomEndpoint.trim()) {
+				connectionStatus = 'error';
+				connectionMessage = 'Please enter an API endpoint';
+				return;
+			}
+
+			testingConnection = true;
+			connectionStatus = 'idle';
+
+			try {
+				const headers: Record<string, string> = {
+					'Content-Type': 'application/json'
+				};
+
+				if (currentCustomApiKey.trim()) {
+					headers['Authorization'] = `Bearer ${currentCustomApiKey}`;
+				}
+
+				const baseUrl = currentCustomEndpoint.trim().replace(/\/+$/, '');
+				
+				// Try different possible endpoints
+				let success = false;
+				let lastError = '';
+				
+				// Test different possible endpoints
+				const testEndpoints = [
+					{ path: '/v1/models', method: 'GET' },
+					{ path: '/models', method: 'GET' },
+					{ path: '/health', method: 'GET' },
+					{ path: '/', method: 'GET' },
+					{ path: '/v1/chat/completions', method: 'POST', body: JSON.stringify({
+						model: currentCustomModelName || 'test-model',
+						messages: [{ role: 'user', content: 'test' }],
+						max_completion_tokens: 16384
+					}) }
+				];
+				
+				for (const endpoint of testEndpoints) {
+					try {
+						const requestOptions: RequestInit = {
+							method: endpoint.method,
+							headers
+						};
+						
+						if (endpoint.body) {
+							requestOptions.body = endpoint.body;
+						}
+						
+						const response = await fetch(`${baseUrl}${endpoint.path}`, requestOptions);
+						
+						// If we get any response that's not 404, consider it successful
+						// (even 401 Unauthorized means the endpoint exists)
+						if (response.status !== 404) {
+							success = true;
+							break;
+						} else {
+							lastError = `Endpoint ${endpoint.path} returned 404`;
+						}
+					} catch (e) {
+						lastError = `Failed to connect to ${endpoint.path}: ${e instanceof Error ? e.message : 'Unknown error'}`;
+						// Continue to next endpoint
+					}
+				}
+
+				if (success) {
+					connectionStatus = 'success';
+					connectionMessage = 'Custom endpoint is accessible!';
+				} else {
+					connectionStatus = 'error';
+					connectionMessage = `Unable to connect to custom endpoint. ${lastError}. Please check the URL and ensure the server is running with a compatible API.`;
+				}
+			} catch (error) {
+				connectionStatus = 'error';
+				connectionMessage = `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+			} finally {
+				testingConnection = false;
+			}
+		}
+	}
+
+	// Auto-save settings when they change (but not during initial load)
+	$effect(() => {
+		if (initialLoadComplete) {
+			providerType.set(currentProviderType);
+			openRouterApiKey.set(currentOpenRouterApiKey);
+			openAIApiKey.set(currentOpenAIApiKey);
+			azureApiKey.set(currentAzureApiKey);
+			azureEndpoint.set(currentAzureEndpoint);
+			azureDeployment.set(currentAzureDeployment);
+			azureApiVersion.set(currentAzureApiVersion);
+			customEndpoint.set(currentCustomEndpoint);
+			customApiKey.set(currentCustomApiKey);
+			customModelName.set(currentCustomModelName);
+			modelParameters.update(params => ({
+				...params,
+				temperature: currentTemperature,
+				maxTokens: currentMaxTokens
+			}));
+		}
+	});
+
+	// Force reactivity when language changes
+	$effect(() => {
+		getLocale(); // Subscribe to language changes
+	});
+</script>
+
+<div class="max-w-7xl mx-auto px-6 py-8">
+	<!-- Page Header -->
+	<div class="mb-8">
+		<h1 class="text-3xl font-semibold text-gray-900 mb-2">{m.settings_page_title()}</h1>
+		<p class="text-gray-600">{m.settings_page_description()}</p>
+	</div>
+
+	<div class="space-y-8">
+		<!-- Model Settings Card -->
+		<Card>
+			{#snippet header()}
+				<h3 class="text-lg font-semibold text-gray-900">{m.settings_model_settings()}</h3>
+				<p class="text-sm text-gray-600 mt-1">{m.settings_model_settings_description()}</p>
+			{/snippet}
+
+			<div class="space-y-6">
+				<!-- Provider Selection Tabs -->
+				<Tabs
+					tabs={providerTabs.map(tab => ({
+						id: tab.id,
+						label: (m as any)[`settings_provider_${tab.id}`]()
+					}))}
+					activeTab={currentProviderType}
+					onTabChange={(tabId) => currentProviderType = tabId as ProviderType}
+				/>
+
+				<!-- OpenRouter Tab Content -->
+				{#if currentProviderType === 'openrouter'}
+					<div class="space-y-4">
+						<p class="text-sm text-gray-500">{m.settings_openrouter_tab_description()}</p>
+
+						<div>
+							<Label for="openrouter-api-key" required>{m.settings_api_key_label()}</Label>
+							<Input
+								id="openrouter-api-key"
+								bind:value={currentOpenRouterApiKey}
+								type="password"
+								placeholder={m.settings_api_key_placeholder()}
+								helpText={m.settings_api_key_help()}
+								required
+							/>
+						</div>
+
+						<div class="flex items-center space-x-3">
+							<Button
+								onclick={testApiConnection}
+								disabled={testingConnection || !currentOpenRouterApiKey.trim()}
+								variant="secondary"
+								iconLeft={testingConnection ? "heroicons:arrow-path" : "heroicons:signal"}
+							>
+								{testingConnection ? m.settings_testing() : m.settings_test_connection()}
+							</Button>
+
+							{#if connectionStatus !== 'idle'}
+								<div class="flex items-center space-x-2">
+									{#if connectionStatus === 'success'}
+										<Icon icon="heroicons:check-circle" class="w-5 h-5 text-green-600" />
+										<span class="text-sm text-green-600">{connectionMessage}</span>
+									{:else if connectionStatus === 'error'}
+										<Icon icon="heroicons:x-circle" class="w-5 h-5 text-red-600" />
+										<span class="text-sm text-red-600">{connectionMessage}</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+
+						<!-- Model Selection -->
+						<div>
+							<Label for="model-select">{m.settings_choose_model()}</Label>
+							{#if loadingModels}
+								<Select
+									bind:value={currentSelectedModel}
+									disabled={true}
+									placeholder={m.settings_loading_models()}
+								/>
+							{:else if allModels.length === 0}
+								<Select
+									bind:value={currentSelectedModel}
+									disabled={true}
+									placeholder={m.settings_no_models_available()}
+								/>
+							{:else}
+								<Select
+									id="model-select"
+									bind:value={currentSelectedModel}
+									optionGroups={Object.entries(modelsByCategory()).map(([category, models]) => ({
+										label: category,
+										options: models.map(model => ({ value: model.id, label: model.name }))
+									}))}
+								/>
+							{/if}
+						</div>
+					</div>
+
+				<!-- OpenAI Tab Content -->
+				{:else if currentProviderType === 'openai'}
+					<div class="space-y-4">
+						<p class="text-sm text-gray-500">Use OpenAI's API directly with your API key. Supports GPT-4 and other OpenAI models.</p>
+
+						<div>
+							<Label for="openai-api-key" required>OpenAI API Key</Label>
+							<Input
+								id="openai-api-key"
+								bind:value={currentOpenAIApiKey}
+								type="password"
+								placeholder="Enter your OpenAI API key"
+								helpText="Get your API key from <a href='https://platform.openai.com/api-keys' target='_blank' rel='noopener noreferrer' class='text-primary-600 hover:text-primary-700 underline'>OpenAI API Keys</a>"
+								required
+							/>
+						</div>
+
+						<div class="flex items-center space-x-3">
+							<Button
+								onclick={testApiConnection}
+								disabled={testingConnection || !currentOpenAIApiKey.trim()}
+								variant="secondary"
+								iconLeft={testingConnection ? "heroicons:arrow-path" : "heroicons:signal"}
+							>
+								{testingConnection ? m.settings_testing() : m.settings_test_connection()}
+							</Button>
+
+							{#if connectionStatus !== 'idle'}
+								<div class="flex items-center space-x-2">
+									{#if connectionStatus === 'success'}
+										<Icon icon="heroicons:check-circle" class="w-5 h-5 text-green-600" />
+										<span class="text-sm text-green-600">{connectionMessage}</span>
+									{:else if connectionStatus === 'error'}
+										<Icon icon="heroicons:x-circle" class="w-5 h-5 text-red-600" />
+										<span class="text-sm text-red-600">{connectionMessage}</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
+
+				<!-- Azure OpenAI Tab Content -->
+				{:else if currentProviderType === 'azure'}
+					<div class="space-y-4">
+						<p class="text-sm text-gray-500">Use Azure OpenAI Service with your Azure endpoint and deployment. Configure your Azure OpenAI resource settings below.</p>
+
+						<div>
+							<Label for="azure-endpoint" required>Azure OpenAI Endpoint</Label>
+							<Input
+								id="azure-endpoint"
+								bind:value={currentAzureEndpoint}
+								placeholder="https://your-resource.openai.azure.com/"
+								helpText="Your Azure OpenAI resource endpoint URL"
+								required
+							/>
+						</div>
+
+						<div>
+							<Label for="azure-deployment" required>Deployment Name</Label>
+							<Input
+								id="azure-deployment"
+								bind:value={currentAzureDeployment}
+								placeholder="gpt-5"
+								helpText="The deployment name of your Azure OpenAI model"
+								required
+							/>
+						</div>
+
+						<div>
+							<Label for="azure-api-key" required>Azure OpenAI API Key</Label>
+							<Input
+								id="azure-api-key"
+								bind:value={currentAzureApiKey}
+								type="password"
+								placeholder="Enter your Azure OpenAI API key"
+								helpText="Get your API key from the Azure portal under your OpenAI resource"
+								required
+							/>
+						</div>
+
+						<div>
+							<Label for="azure-api-version">API Version</Label>
+							<Input
+								id="azure-api-version"
+								bind:value={currentAzureApiVersion}
+								placeholder="2024-12-01-preview"
+								helpText="Azure OpenAI API version (leave empty for latest)"
+							/>
+						</div>
+
+						<div class="flex items-center space-x-3">
+							<Button
+								onclick={testApiConnection}
+								disabled={testingConnection || !currentAzureApiKey.trim() || !currentAzureEndpoint.trim() || !currentAzureDeployment.trim()}
+								variant="secondary"
+								iconLeft={testingConnection ? "heroicons:arrow-path" : "heroicons:signal"}
+							>
+								{testingConnection ? m.settings_testing() : m.settings_test_connection()}
+							</Button>
+
+							{#if connectionStatus !== 'idle'}
+								<div class="flex items-center space-x-2">
+									{#if connectionStatus === 'success'}
+										<Icon icon="heroicons:check-circle" class="w-5 h-5 text-green-600" />
+										<span class="text-sm text-green-600">{connectionMessage}</span>
+									{:else if connectionStatus === 'error'}
+										<Icon icon="heroicons:x-circle" class="w-5 h-5 text-red-600" />
+										<span class="text-sm text-red-600">{connectionMessage}</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
+
+				<!-- Custom LLM Tab Content -->
+				{:else if currentProviderType === 'custom'}
+					<div class="space-y-4">
+						<p class="text-sm text-gray-500">{m.settings_custom_tab_description()}</p>
+
+						<div>
+							<Label for="custom-endpoint" required>{m.settings_custom_endpoint_label()}</Label>
+							<Input
+								id="custom-endpoint"
+								bind:value={currentCustomEndpoint}
+								placeholder={m.settings_custom_endpoint_placeholder()}
+								helpText={m.settings_custom_endpoint_help()}
+								required
+							/>
+						</div>
+
+						<div>
+							<Label for="custom-api-key">{m.settings_custom_api_key_label()}</Label>
+							<Input
+								id="custom-api-key"
+								bind:value={currentCustomApiKey}
+								type="password"
+								placeholder={m.settings_custom_api_key_placeholder()}
+								helpText={m.settings_custom_api_key_help()}
+							/>
+						</div>
+
+						<div>
+							<Label for="custom-model-name" required>{m.settings_custom_model_name_label()}</Label>
+							<Input
+								id="custom-model-name"
+								bind:value={currentCustomModelName}
+								placeholder={m.settings_custom_model_name_placeholder()}
+								helpText={m.settings_custom_model_name_help()}
+								required
+							/>
+						</div>
+
+						<div class="flex items-center space-x-3">
+							<Button
+								onclick={testApiConnection}
+								disabled={testingConnection || !currentCustomEndpoint.trim()}
+								variant="secondary"
+								iconLeft={testingConnection ? "heroicons:arrow-path" : "heroicons:signal"}
+							>
+								{testingConnection ? m.settings_testing() : m.settings_test_connection()}
+							</Button>
+
+							{#if connectionStatus !== 'idle'}
+								<div class="flex items-center space-x-2">
+									{#if connectionStatus === 'success'}
+										<Icon icon="heroicons:check-circle" class="w-5 h-5 text-green-600" />
+										<span class="text-sm text-green-600">{connectionMessage}</span>
+									{:else if connectionStatus === 'error'}
+										<Icon icon="heroicons:x-circle" class="w-5 h-5 text-red-600" />
+										<span class="text-sm text-red-600">{connectionMessage}</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Selected Model Information (only for OpenRouter) -->
+				{#if currentProviderType === 'openrouter' && currentSelectedModel}
+					{@const currentModel = allModels.find(m => m.id === currentSelectedModel)}
+					{#if currentModel}
+						<div class="bg-secondary-50 p-4 rounded-lg border border-secondary-200">
+							<h5 class="text-sm font-medium text-secondary-900 mb-2">{m.settings_selected_model_info()}</h5>
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+								<div>
+									<span class="font-medium text-secondary-700">{m.settings_provider_label()}:</span>
+									<span class="text-secondary-600">{currentModel.provider}</span>
+								</div>
+								<div>
+									<span class="font-medium text-secondary-700">{m.settings_model_label()}:</span>
+									<span class="text-secondary-600">{currentModel.name}</span>
+								</div>
+								<div class="md:col-span-2">
+									<span class="font-medium text-secondary-700">{m.settings_id_label()}:</span>
+									<span class="text-secondary-600 font-mono text-xs">{currentModel.id}</span>
+								</div>
+								{#if currentModel.context_length}
+									<div>
+										<span class="font-medium text-secondary-700">{m.settings_context_length_label()}:</span>
+										<span class="text-secondary-600">{m.settings_tokens_count({ count: currentModel.context_length.toLocaleString() })}</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				{/if}
+			</div>
+		</Card>
+
+		<!-- Generation Parameters Card -->
+		<Card>
+			{#snippet header()}
+				<h3 class="text-lg font-semibold text-gray-900">{m.settings_parameters_card_title()}</h3>
+				<p class="text-sm text-gray-600 mt-1">{m.settings_parameters_card_description()}</p>
+			{/snippet}
+
+			<div class="space-y-6">
+				<div>
+					<div class="flex">
+						<Label for="temperature">
+							{m.settings_temperature_label()}: <span class="font-medium">{currentTemperature}</span>
+						</Label>
+					</div>
+					<input
+						id="temperature"
+						type="range"
+						min="0"
+						max="2"
+						step="0.1"
+						bind:value={currentTemperature}
+						class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+					/>
+					<div class="flex justify-between text-xs text-gray-500 mt-1">
+						<span>{m.settings_deterministic()}</span>
+						<span>{m.settings_creative()}</span>
+					</div>
+					<p class="text-sm text-gray-500 mt-1">{m.settings_temperature_description()}</p>
+				</div>
+
+				<div>
+					<Label for="max-tokens">
+						{m.settings_max_tokens_label()}
+					</Label>
+					<input
+						id="max-tokens"
+						type="number"
+						min="1"
+						max="32768"
+						step="1"
+						bind:value={currentMaxTokens}
+						class="block w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+					/>
+					<p class="text-sm text-gray-500 mt-1">{m.settings_max_tokens_description()}</p>
+				</div>
+			</div>
+		</Card>
+	</div>
+</div>
