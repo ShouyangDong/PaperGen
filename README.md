@@ -1,4 +1,4 @@
-# COLab Tools
+# PaperMind Tools
 
 A collection of AI-powered research tools developed by the Computational Omics Laboratory at Pusan National University. These tools are designed to assist researchers with various aspects of their scientific work while maintaining transparency, traceability, and human oversight.
 
@@ -83,7 +83,7 @@ The application stores settings locally in your browser. Configure:
 - **Deployment Name**: Your Azure OpenAI model deployment name (for Azure provider)
 - **API Version**: Azure OpenAI API version (for Azure provider)
 - **AI Model**: Choose from available models (for OpenRouter)
-- **Language**: Select interface language (English/Korean supported)
+- **Language**: Select interface language (English/Chinese supported)
 
 #### Citation Styles
 

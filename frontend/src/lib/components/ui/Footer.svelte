@@ -7,13 +7,13 @@
 	<div class="max-w-5xl mx-auto px-6">
 		<div class="relative flex items-center justify-center text-sm text-secondary-500">
 			<div class="flex items-center gap-4">
-				<a href="https://pnucolab.com/" target="_blank" rel="noopener noreferrer" class="hover:text-primary-600 transition-colors">
+				<a href="https://pnuPaperMind.com/" target="_blank" rel="noopener noreferrer" class="hover:text-primary-600 transition-colors">
 					{m.main_footer_org()}
 				</a>
 				<span>© 2025</span>
 			</div>
 			<a
-				href="https://github.com/pnucolab/paper-gen"
+				href="https://github.com/pnuPaperMind/paper-gen"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="absolute right-0 hover:text-primary-600 transition-colors"

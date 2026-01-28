@@ -87,7 +87,7 @@ function replaceVariables(template: string, variables: Record<string, string>): 
  * Get language enforcement text for interface language
  */
 function getInterfaceLanguageEnforcement(interfaceLanguage: string): string {
-	const languageName = interfaceLanguage === 'ko' ? '한국어 (Korean)' : 'English';
+	const languageName = interfaceLanguage === 'cn' ? '中文 (Chinese)' : 'English';
 
 	return `
 CRITICAL LANGUAGE REQUIREMENT - THIS IS ABSOLUTELY MANDATORY
