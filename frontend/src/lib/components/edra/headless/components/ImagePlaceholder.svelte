@@ -8,7 +8,14 @@
 	function handleClick() {
 		const imageUrl = prompt('Please enter the image URL');
 		if (imageUrl) {
-			editor.chain().focus().setImage({ src: imageUrl }).run();
+			editor.chain().focus().insertContent({
+				type: 'image',
+				attrs: {
+					src: imageUrl,
+					alt: '',
+					title: ''
+				}
+			}).run();
 		}
 	}
 </script>
