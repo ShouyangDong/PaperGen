@@ -229,6 +229,7 @@
 	"revisions_modified": "修改时间",
 	"revisions_download_md": "下载MD",
 	"revisions_download_docx": "下载DOCX",
+	"revisions_download_pdf": "下载PDF",
 	"revisions_upload_warning_title": "上传警告",
 	"revisions_upload_warning_message": "除非您使用本地LLM，否则不要上传同行评审文章或机密内容。上传敏感内容可能违反所需保密协议，并与第三方服务分享信息。",
 	"bubble_menu_ai_revise": "AI修订",

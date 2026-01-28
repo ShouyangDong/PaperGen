@@ -90,9 +90,12 @@
 	class:border-secondary-200={disabled}
 	class:bg-secondary-50={disabled}
 	class:opacity-60={disabled}
+	role="button"
+	tabindex="0"
 	ondrop={handleDrop}
 	ondragover={handleDragOver}
-	ondragleave={handleDragLeave}>
+	ondragleave={handleDragLeave}
+	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } }}>
 	<input
 		type="file"
 		{multiple}

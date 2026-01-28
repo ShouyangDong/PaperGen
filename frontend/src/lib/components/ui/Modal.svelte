@@ -68,9 +68,11 @@
 	<div 
 		class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
 		onclick={handleBackdropClick}
+		onkeydown={(e) => { if (e.key === 'Escape') handleClose(); }}
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby={title ? 'modal-title' : undefined}
+		tabindex="-1"
 	>
 		<div 
 			class="bg-white rounded-lg shadow-xl w-full {sizeClasses[size]} mx-4 flex flex-col"

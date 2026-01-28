@@ -40,7 +40,11 @@
 		oninput
 	}: Props = $props();
 
-	let inputId = id;
+	let inputId = $state(id);
+
+	$effect(() => {
+		inputId = id;
+	});
 
 	function getInputClasses() {
 		const baseClasses = [
