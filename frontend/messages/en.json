@@ -620,6 +620,7 @@
 	"revisions_modified": "Modified",
 	"revisions_download_md": "Download MD",
 	"revisions_download_docx": "Download DOCX",
+	"revisions_download_pdf": "Download PDF",
 	"revisions_upload_warning_title": "Confidentiality Warning",
 	"revisions_upload_warning_message": "Do not upload peer-review articles or confidential content unless you are using a local LLM. Uploading sensitive content may violate required confidentiality agreements and share information with third-party services.",
 	"bubble_menu_ai_revise": "AI Revise",

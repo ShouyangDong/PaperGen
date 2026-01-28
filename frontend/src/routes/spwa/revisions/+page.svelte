@@ -309,6 +309,7 @@
 
 	// Download as Markdown
 	function downloadAsMarkdown(project: RevisionProject | null) {
+		console.log('Downloading as Markdown:', project?.title);
 		if (!project) return;
 
 		const blob = new Blob([project.content], { type: 'text/markdown' });
@@ -324,6 +325,7 @@
 
 	// Download as DOCX using proper DOCX generation
 	async function downloadAsDocx(project: RevisionProject | null) {
+		console.log('Downloading as DOCX:', project?.title);
 		if (!project) return;
 
 		try {
@@ -332,6 +334,20 @@
 		} catch (error) {
 			console.error('Failed to download DOCX:', error);
 			alert(m.revisions_docx_generation_failed());
+		}
+	}
+
+	// Download as PDF using proper PDF generation
+	async function downloadAsPdf(project: RevisionProject | null) {
+		console.log('Downloading as PDF:', project?.title);
+		if (!project) return;
+
+		try {
+			const { downloadPdfFile } = await import('$lib/utils/downloads');
+			await downloadPdfFile(project.content, project.title);
+		} catch (error) {
+			console.error('Failed to download PDF:', error);
+			alert(m.download_error_pdf());
 		}
 	}
 
@@ -806,6 +822,13 @@
 									iconLeft="heroicons:document-arrow-down"
 								>
 									{m.revisions_download_docx()}
+								</Button>
+								<Button
+									onclick={() => downloadAsPdf(selectedProject)}
+									variant="secondary"
+									iconLeft="heroicons:document"
+								>
+									{m.revisions_download_pdf()}
 								</Button>
 							</div>
 						</div>

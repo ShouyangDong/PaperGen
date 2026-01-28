@@ -38,7 +38,12 @@
 	let resizingInitialMouseX = $state(0);
 	let resizingPosition = $state<'left' | 'right'>('left');
 
-	let caption: string | null = $state(node.attrs.title);
+	let caption: string | null = $state(null);
+
+	$effect(() => {
+		caption = node.attrs.title;
+	});
+
 	$effect(() => {
 		if (caption?.trim() === '') caption = null;
 		updateAttributes({ title: caption });
